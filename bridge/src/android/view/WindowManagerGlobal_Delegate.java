@@ -16,7 +16,10 @@
 
 package android.view;
 
+import com.android.layoutlib.bridge.android.BridgeContext;
 import com.android.tools.layoutlib.annotations.LayoutlibDelegate;
+
+import android.content.Context;
 
 /**
  * Delegate used to provide new implementation of a select few methods of
@@ -39,5 +42,41 @@ public class WindowManagerGlobal_Delegate {
 
     public static void setWindowManagerService(IWindowManager service) {
         sService = service;
+    }
+
+    /**
+     * Purges all views, roots, and params associated with the given context from
+     * {@link WindowManagerGlobal}.
+     */
+    public static void clearViewsForContext(Context context) {
+        WindowManagerGlobal global = WindowManagerGlobal.getInstance();
+        synchronized (global.mLock) {
+            boolean removedAny = false;
+            for (int i = global.mRoots.size() - 1; i >= 0; i--) {
+                ViewRootImpl root = global.mRoots.get(i);
+                View view = (i < global.mViews.size()) ? global.mViews.get(i) : null;
+                Context viewContext = (view != null) ? view.getContext()
+                        : (root != null ? root.mContext : null);
+                if (viewContext != null && BridgeContext.getBaseContext(viewContext) == context) {
+                    global.mRoots.remove(i);
+                    if (i < global.mParams.size()) {
+                        global.mParams.remove(i);
+                    }
+                    if (i < global.mViews.size()) {
+                        View v = global.mViews.remove(i);
+                        if (global.mDyingViews != null && v != null) {
+                            global.mDyingViews.remove(v);
+                        }
+                        if (v != null) {
+                            v.assignParent(null);
+                        }
+                    }
+                    removedAny = true;
+                }
+            }
+            if (removedAny && global.mWindowViewsListenerGroup != null) {
+                global.mWindowViewsListenerGroup.accept(global.getWindowViews());
+            }
+        }
     }
 }

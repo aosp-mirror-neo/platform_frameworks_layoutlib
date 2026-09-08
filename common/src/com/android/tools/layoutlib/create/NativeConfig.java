@@ -154,6 +154,7 @@ public class NativeConfig {
             "android.view.View#isInEditMode",
             "android.view.View#layout",
             "android.view.View#measure",
+            "android.view.ViewRootImpl#checkThread",
             "android.view.ViewRootImpl#performHapticFeedback",
             "android.view.WindowManager#useClientSurface",
             "android.view.WindowManagerGlobal#getWindowManagerService",

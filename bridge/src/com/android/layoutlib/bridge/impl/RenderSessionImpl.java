@@ -79,6 +79,7 @@ import android.view.ViewRootImpl_Accessor;
 import android.view.Window;
 import android.view.WindowManager;
 import android.view.WindowManagerGlobal;
+import android.view.WindowManagerGlobal_Delegate;
 import android.widget.ActionMenuView;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
@@ -1388,8 +1389,15 @@ public class RenderSessionImpl extends RenderAction<SessionParams> {
             WindowManager wm = (WindowManager)getContext().getSystemService(Context.WINDOW_SERVICE);
             List<View> views = getWindowViews();
             for (View view : views) {
-                wm.removeViewImmediate(view);
+                try {
+                    ViewRootImpl root = view.getViewRootImpl();
+                    ViewRootImpl_Accessor.resetTraversalState(root);
+                    wm.removeViewImmediate(view);
+                } catch (Throwable t) {
+                    getContext().error("Error while removing window view", t);
+                }
             }
+            clearWindowViews();
             getContext().getSessionInteractiveData().dispose();
             if (mViewInfoList != null) {
                 mViewInfoList.clear();
@@ -1407,5 +1415,15 @@ public class RenderSessionImpl extends RenderAction<SessionParams> {
             getContext().error("Error while disposing a RenderSession", t);
         }
         super.dispose();
+    }
+
+    /**
+     * Purges all window views associated with this session's context from
+     * {@link WindowManagerGlobal}.
+     * It can be called safely even when the layoutlib lock is not held, as WindowManagerGlobal
+     * synchronizes on its own internal lock.
+     */
+    public void clearWindowViews() {
+        WindowManagerGlobal_Delegate.clearViewsForContext(getContext());
     }
 }
