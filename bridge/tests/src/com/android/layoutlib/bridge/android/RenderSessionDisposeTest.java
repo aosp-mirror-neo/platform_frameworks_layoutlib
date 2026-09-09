@@ -115,4 +115,46 @@ public class RenderSessionDisposeTest extends RenderTestBase {
         assertTrue("WindowManagerGlobal should have cleared views even if traversal had issues",
                 viewsAfterDispose.isEmpty());
     }
+
+    @Test
+    public void testSessionDisposeRemovesWindowViewsListener() {
+        String layoutStr =
+                "<FrameLayout xmlns:android=\"http://schemas.android.com/apk/res/android\"\n" +
+                        "              android:layout_width=\"match_parent\"\n" +
+                        "              android:layout_height=\"match_parent\"/>";
+
+        LayoutPullParser parser = LayoutPullParser.createFromString(layoutStr);
+        LayoutlibBridgeClientCallback callback =
+                new LayoutlibBridgeClientCallback(getLogger(), mDefaultClassLoader,
+                        "com.android.layoutlib.test.myapplication");
+        SessionParams params = getSessionParamsBuilder()
+                .setParser(parser)
+                .setCallback(callback)
+                .build();
+
+        RenderSession session = sBridge.createSession(params);
+        try {
+            Result renderResult = session.render(50000);
+            assertTrue("Render failed: " + renderResult.getErrorMessage(),
+                    renderResult.isSuccess());
+
+            assertTrue("WindowManagerGlobal should have active window views listener during session",
+                    hasWindowViewsListeners());
+        } finally {
+            session.dispose();
+        }
+
+        assertFalse("WindowManagerGlobal should have removed window views listener after session dispose",
+                hasWindowViewsListeners());
+    }
+
+    /**
+     * Checks if {@link WindowManagerGlobal} has any registered window views listeners.
+     */
+    private static boolean hasWindowViewsListeners() {
+        WindowManagerGlobal global = WindowManagerGlobal.getInstance();
+        return global.mWindowViewsListenerGroup != null
+                && global.mWindowViewsListenerGroup.mListeners != null
+                && !global.mWindowViewsListenerGroup.mListeners.isEmpty();
+    }
 }

@@ -21,6 +21,9 @@ import com.android.tools.layoutlib.annotations.LayoutlibDelegate;
 
 import android.content.Context;
 
+import java.util.List;
+import java.util.function.Consumer;
+
 /**
  * Delegate used to provide new implementation of a select few methods of
  * {@link WindowManagerGlobal}
@@ -77,6 +80,34 @@ public class WindowManagerGlobal_Delegate {
             if (removedAny && global.mWindowViewsListenerGroup != null) {
                 global.mWindowViewsListenerGroup.accept(global.getWindowViews());
             }
+        }
+    }
+
+    /**
+     * Directly adds the given window views listener to {@link WindowManagerGlobal}.
+     */
+    public static void addWindowViewsListener(Consumer<List<View>> listener) {
+        if (listener == null) {
+            return;
+        }
+        WindowManagerGlobal global = WindowManagerGlobal.getInstance();
+        if (global.mWindowViewsListenerGroup != null
+                && global.mWindowViewsListenerGroup.mListeners != null) {
+            global.mWindowViewsListenerGroup.mListeners.put(listener, Runnable::run);
+        }
+    }
+
+    /**
+     * Removes the given window views listener from {@link WindowManagerGlobal}.
+     */
+    public static void removeWindowViewsListener(Consumer<List<View>> listener) {
+        if (listener == null) {
+            return;
+        }
+        WindowManagerGlobal global = WindowManagerGlobal.getInstance();
+        if (global.mWindowViewsListenerGroup != null
+                && global.mWindowViewsListenerGroup.mListeners != null) {
+            global.mWindowViewsListenerGroup.mListeners.remove(listener);
         }
     }
 }
