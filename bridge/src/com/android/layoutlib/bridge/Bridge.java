@@ -484,9 +484,10 @@ public final class Bridge extends com.android.ide.common.rendering.api.Bridge {
 
     @Override
     public Result renderDrawable(DrawableParams params) {
+        RenderDrawable action = null;
         try {
             Result lastResult;
-            RenderDrawable action = new RenderDrawable(params);
+            action = new RenderDrawable(params);
             try {
                 lastResult = action.init(params.getTimeout());
                 if (lastResult.isSuccess()) {
@@ -505,6 +506,10 @@ public final class Bridge extends com.android.ide.common.rendering.api.Bridge {
                 t2 = t.getCause();
             }
             return ERROR_UNKNOWN.createResult(t2.getMessage(), t);
+        } finally {
+            if (action != null) {
+                action.dispose();
+            }
         }
     }
 

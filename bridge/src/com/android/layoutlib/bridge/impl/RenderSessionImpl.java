@@ -1176,10 +1176,6 @@ public class RenderSessionImpl extends RenderAction<SessionParams> {
         mMeasuredScreenWidth = mMeasuredScreenHeight = -1;
     }
 
-    public BufferedImage getImage() {
-        return mImage;
-    }
-
     @Nullable
     public RecyclableImage getRecyclableImage() {
         if (mImage == null) {

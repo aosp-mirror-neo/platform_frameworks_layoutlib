@@ -18,7 +18,6 @@ package com.android.layoutlib.bridge.intensive.util;
 
 import com.android.SdkConstants;
 import com.android.ide.common.rendering.api.AssetRepository;
-import com.android.ide.common.rendering.api.IImageFactory;
 import com.android.ide.common.rendering.api.ILayoutLog;
 import com.android.ide.common.rendering.api.LayoutlibCallback;
 import com.android.ide.common.rendering.api.RenderSizeProvider;
@@ -62,7 +61,6 @@ public class SessionParamsBuilder {
     private final Map<SessionParams.Key, Object> mFlags = new HashMap<>();
     private AssetRepository mAssetRepository = null;
     private boolean mDecor = true;
-    private IImageFactory mImageFactory = null;
     private RenderSizeProvider mSizeProvider = null;
     private boolean enableLayoutValidator = false;
     private boolean transparentBackground = false;
@@ -168,12 +166,6 @@ public class SessionParamsBuilder {
     }
 
     @NonNull
-    public SessionParamsBuilder setImageFactory(@NonNull IImageFactory imageFactory) {
-        mImageFactory = imageFactory;
-        return this;
-    }
-
-    @NonNull
     public SessionParamsBuilder setSizeProvider(@NonNull RenderSizeProvider sizeProvider) {
         mSizeProvider = sizeProvider;
         return this;
@@ -235,9 +227,6 @@ public class SessionParamsBuilder {
         caching */, mConfigGenerator.getHardwareConfig(), resourceResolver, mLayoutlibCallback,
                 mMinSdk, mTargetSdk, mLayoutLog, mSimulatedSdk);
         params.setLayoutValidationChecker(() -> enableLayoutValidator);
-        if (mImageFactory != null) {
-            params.setImageFactory(mImageFactory);
-        }
         if (mSizeProvider != null) {
             params.setSizeProvider(mSizeProvider);
         }

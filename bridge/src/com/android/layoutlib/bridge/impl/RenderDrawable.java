@@ -46,7 +46,7 @@ import java.util.Objects;
 
 /**
  * Action to render a given {@link Drawable} provided through {@link DrawableParams#getDrawable()}.
- *
+ * <p>
  * The class only provides a simple {@link #render()} method, but the full life-cycle of the
  * action must be respected.
  *
@@ -165,5 +165,10 @@ public class RenderDrawable extends RenderAction<DrawableParams> {
         renderer.destroy();
 
         return image;
+    }
+
+    @Override
+    public void dispose() {
+        super.dispose();
     }
 }

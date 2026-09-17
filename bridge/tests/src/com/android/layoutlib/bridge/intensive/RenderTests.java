@@ -1843,7 +1843,7 @@ public class RenderTests extends RenderTestBase {
             }
 
             RecyclableImage recyclableImage = session.getRecyclableImage();
-            BufferedImage resultImage = recyclableImage.getImage();
+            BufferedImage resultImage = recyclableImage.getCopy();
 
             assertNotNull(resultImage);
             verify("button_resize.png", resultImage);
@@ -1862,7 +1862,7 @@ public class RenderTests extends RenderTestBase {
             }
 
             recyclableImage = session.getRecyclableImage();
-            resultImage = recyclableImage.getImage();
+            resultImage = recyclableImage.getCopy();
 
             assertNotNull(resultImage);
             verify("button_resize2.png", resultImage);
