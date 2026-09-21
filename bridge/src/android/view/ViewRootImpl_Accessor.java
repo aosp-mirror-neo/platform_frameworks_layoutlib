@@ -16,6 +16,7 @@
 
 package android.view;
 
+import android.graphics.Rect;
 import com.android.internal.lang.System_Delegate;
 
 /**
@@ -34,7 +35,21 @@ public class ViewRootImpl_Accessor {
     public static void performTraversals(ViewRootImpl viewRoot) {
         viewRoot.mTraversalScheduled = true;
         viewRoot.postTraversalBarrier();
-        viewRoot.doTraversal(System_Delegate.nanoTime());
+        try {
+            viewRoot.doTraversal(System_Delegate.nanoTime());
+        } finally {
+            viewRoot.mIsInTraversal = false;
+        }
+    }
+
+    public static void resetTraversalState(ViewRootImpl viewRoot) {
+        setInTraversal(viewRoot, false);
+    }
+
+    public static void setInTraversal(ViewRootImpl viewRoot, boolean inTraversal) {
+        if (viewRoot != null) {
+            viewRoot.mIsInTraversal = inTraversal;
+        }
     }
 
     public static void updateFrame(ViewRootImpl viewRoot, int width, int height) {
@@ -43,7 +58,7 @@ public class ViewRootImpl_Accessor {
         viewRoot.mTmpFrames.displayFrame.set(0, 0, width, height);
     }
 
-    public static android.graphics.Rect getWindowFrame(ViewRootImpl viewRoot) {
+    public static Rect getWindowFrame(ViewRootImpl viewRoot) {
         return viewRoot.mWinFrame;
     }
 }
