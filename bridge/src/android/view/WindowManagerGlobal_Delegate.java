@@ -91,9 +91,11 @@ public class WindowManagerGlobal_Delegate {
             return;
         }
         WindowManagerGlobal global = WindowManagerGlobal.getInstance();
-        if (global.mWindowViewsListenerGroup != null
-                && global.mWindowViewsListenerGroup.mListeners != null) {
-            global.mWindowViewsListenerGroup.mListeners.put(listener, Runnable::run);
+        synchronized (global.mLock) {
+            if (global.mWindowViewsListenerGroup != null
+                    && global.mWindowViewsListenerGroup.mListeners != null) {
+                global.mWindowViewsListenerGroup.mListeners.put(listener, Runnable::run);
+            }
         }
     }
 
@@ -105,9 +107,11 @@ public class WindowManagerGlobal_Delegate {
             return;
         }
         WindowManagerGlobal global = WindowManagerGlobal.getInstance();
-        if (global.mWindowViewsListenerGroup != null
-                && global.mWindowViewsListenerGroup.mListeners != null) {
-            global.mWindowViewsListenerGroup.mListeners.remove(listener);
+        synchronized (global.mLock) {
+            if (global.mWindowViewsListenerGroup != null
+                    && global.mWindowViewsListenerGroup.mListeners != null) {
+                global.mWindowViewsListenerGroup.mListeners.remove(listener);
+            }
         }
     }
 }

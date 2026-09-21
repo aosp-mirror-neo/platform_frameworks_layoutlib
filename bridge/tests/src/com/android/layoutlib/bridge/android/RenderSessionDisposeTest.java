@@ -28,11 +28,20 @@ import android.view.View;
 import android.view.ViewRootImpl;
 import android.view.ViewRootImpl_Accessor;
 import android.view.WindowManagerGlobal;
+import android.view.WindowManagerGlobal_Delegate;
+import com.android.layoutlib.bridge.impl.RenderSessionImpl;
 
+import java.lang.reflect.Field;
 import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 /**
@@ -148,13 +157,106 @@ public class RenderSessionDisposeTest extends RenderTestBase {
                 hasWindowViewsListeners());
     }
 
+    @Test
+    public void testConcurrentWindowViewsListenerAddAndRemove() throws InterruptedException {
+        int threadCount = 8;
+        int iterations = 100;
+        CountDownLatch startLatch = new CountDownLatch(1);
+        CountDownLatch doneLatch = new CountDownLatch(threadCount);
+        AtomicReference<Throwable> error = new AtomicReference<>();
+
+        for (int i = 0; i < threadCount; i++) {
+            new Thread(() -> {
+                try {
+                    startLatch.await();
+                    for (int j = 0; j < iterations; j++) {
+                        Consumer<List<View>> listener = views -> {};
+                        WindowManagerGlobal_Delegate.addWindowViewsListener(listener);
+                        WindowManagerGlobal_Delegate.removeWindowViewsListener(listener);
+                    }
+                } catch (Throwable t) {
+                    error.compareAndSet(null, t);
+                } finally {
+                    doneLatch.countDown();
+                }
+            }).start();
+        }
+
+        startLatch.countDown();
+        assertTrue("Threads did not finish in time", doneLatch.await(10, TimeUnit.SECONDS));
+        assertNull("Concurrent add/remove threw an exception: " + error.get(), error.get());
+    }
+
+    @Test
+    public void testConcurrentClearWindowViewsAndDispose() throws Exception {
+        String layoutStr =
+                "<FrameLayout xmlns:android=\"http://schemas.android.com/apk/res/android\"\n" +
+                        "              android:layout_width=\"match_parent\"\n" +
+                        "              android:layout_height=\"match_parent\"/>";
+
+        LayoutPullParser parser = LayoutPullParser.createFromString(layoutStr);
+        LayoutlibBridgeClientCallback callback =
+                new LayoutlibBridgeClientCallback(getLogger(), mDefaultClassLoader,
+                        "com.android.layoutlib.test.myapplication");
+        SessionParams params = getSessionParamsBuilder()
+                .setParser(parser)
+                .setCallback(callback)
+                .build();
+
+        RenderSession session = sBridge.createSession(params);
+        Result renderResult = session.render(50000);
+        assertTrue("Render failed: " + renderResult.getErrorMessage(), renderResult.isSuccess());
+
+        Field sessionField = session.getClass().getDeclaredField("mSession");
+        sessionField.setAccessible(true);
+        RenderSessionImpl sessionImpl = (RenderSessionImpl) sessionField.get(session);
+
+        int threadCount = 4;
+        CountDownLatch startLatch = new CountDownLatch(1);
+        CountDownLatch doneLatch = new CountDownLatch(threadCount + 1);
+        AtomicReference<Throwable> error = new AtomicReference<>();
+
+        for (int i = 0; i < threadCount; i++) {
+            new Thread(() -> {
+                try {
+                    startLatch.await();
+                    sessionImpl.clearWindowViews();
+                } catch (Throwable t) {
+                    error.compareAndSet(null, t);
+                } finally {
+                    doneLatch.countDown();
+                }
+            }).start();
+        }
+
+        new Thread(() -> {
+            try {
+                startLatch.await();
+                session.dispose();
+            } catch (Throwable t) {
+                error.compareAndSet(null, t);
+            } finally {
+                doneLatch.countDown();
+            }
+        }).start();
+
+        startLatch.countDown();
+        assertTrue("Threads did not finish in time", doneLatch.await(10, TimeUnit.SECONDS));
+        assertNull("Concurrent clearWindowViews/dispose threw an exception: " + error.get(),
+                error.get());
+        assertFalse("WindowManagerGlobal should have removed window views listener",
+                hasWindowViewsListeners());
+    }
+
     /**
      * Checks if {@link WindowManagerGlobal} has any registered window views listeners.
      */
     private static boolean hasWindowViewsListeners() {
         WindowManagerGlobal global = WindowManagerGlobal.getInstance();
-        return global.mWindowViewsListenerGroup != null
-                && global.mWindowViewsListenerGroup.mListeners != null
-                && !global.mWindowViewsListenerGroup.mListeners.isEmpty();
+        synchronized (global.mLock) {
+            return global.mWindowViewsListenerGroup != null
+                    && global.mWindowViewsListenerGroup.mListeners != null
+                    && !global.mWindowViewsListenerGroup.mListeners.isEmpty();
+        }
     }
 }

@@ -159,6 +159,7 @@ public class RenderSessionImpl extends RenderAction<SessionParams> {
 
     private long mLastActionDownTimeNanos = -1;
     @Nullable private ValidatorHierarchy mValidatorHierarchy = null;
+    private final Object mWindowListenerLock = new Object();
     private Consumer<List<View>> mWindowChangeListener;
 
     private static final class PostInflateException extends Exception {
@@ -385,9 +386,11 @@ public class RenderSessionImpl extends RenderAction<SessionParams> {
             mRenderer = AttachInfo_Accessor.setAttachInfo(mViewRoot, layout);
 
             // Invalidate rendering when window is added or removed
-            removeWindowViewsListener();
-            mWindowChangeListener = new WindowChangeListener(this);
-            WindowManagerGlobal_Delegate.addWindowViewsListener(mWindowChangeListener);
+            synchronized (mWindowListenerLock) {
+                removeWindowViewsListener();
+                mWindowChangeListener = new WindowChangeListener(this);
+                WindowManagerGlobal_Delegate.addWindowViewsListener(mWindowChangeListener);
+            }
 
             // post-inflate process. For now this supports TabHost/TabWidget
             postInflateProcess(view, params.getLayoutlibCallback(), isPreference ? view : null);
@@ -1369,9 +1372,11 @@ public class RenderSessionImpl extends RenderAction<SessionParams> {
     }
 
     private void removeWindowViewsListener() {
-        if (mWindowChangeListener != null) {
-            WindowManagerGlobal_Delegate.removeWindowViewsListener(mWindowChangeListener);
-            mWindowChangeListener = null;
+        synchronized (mWindowListenerLock) {
+            if (mWindowChangeListener != null) {
+                WindowManagerGlobal_Delegate.removeWindowViewsListener(mWindowChangeListener);
+                mWindowChangeListener = null;
+            }
         }
     }
 
