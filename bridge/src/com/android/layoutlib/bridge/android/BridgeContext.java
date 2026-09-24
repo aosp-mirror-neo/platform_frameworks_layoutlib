@@ -135,6 +135,7 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.WeakHashMap;
 import java.util.concurrent.Executor;
 
 import static android.os._Original_Build.VERSION_CODES.JELLY_BEAN_MR1;
@@ -174,7 +175,7 @@ public class BridgeContext extends Context {
     }
 
     /** The map adds cookies to each view so that IDE can link xml tags to views. */
-    private final HashMap<View, Object> mViewKeyMap = new HashMap<>();
+    private final Map<View, Object> mViewKeyMap = new WeakHashMap<>();
     /**
      * In some cases, when inflating an xml, some objects are created. Then later, the objects are
      * converted to views. This map stores the mapping from objects to cookies which can then be
@@ -201,8 +202,8 @@ public class BridgeContext extends Context {
     private final AppOpsManager mAppOpsManager;
     private final UiModeManager mUiModeManager;
     private final SelectionToolbarManager mSelectionToolbarManager;
-    private final HashMap<View, Integer> mScrollYPos = new HashMap<>();
-    private final HashMap<View, Integer> mScrollXPos = new HashMap<>();
+    private final Map<View, Integer> mScrollYPos = new WeakHashMap<>();
+    private final Map<View, Integer> mScrollXPos = new WeakHashMap<>();
 
     private static final String CREATE_CONFIG_NOT_SUPPORTED = String.format(Locale.ENGLISH,
             "We do not currently support #createConfigurationContext.");
@@ -210,8 +211,8 @@ public class BridgeContext extends Context {
     private Resources.Theme mTheme;
 
     private final Map<Object, Map<ResourceReference, ResourceValue>> mDefaultPropMaps =
-            new IdentityHashMap<>();
-    private final Map<Object, ResourceReference> mDefaultStyleMap = new IdentityHashMap<>();
+            new WeakHashMap<>();
+    private final Map<Object, ResourceReference> mDefaultStyleMap = new WeakHashMap<>();
 
     // cache for TypedArray generated from StyleResourceValue object
     private TypedArrayCache mTypedArrayCache;
