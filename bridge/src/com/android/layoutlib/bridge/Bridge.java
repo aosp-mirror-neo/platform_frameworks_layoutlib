@@ -107,9 +107,12 @@ public final class Bridge extends com.android.ide.common.rendering.api.Bridge {
     private final static ReentrantLock sLock = new ReentrantLock();
 
     /**
-     * Maps from id to resource type/name. This is for com.android.internal.R
+     * Maps from id to resource type/name. This is for com.android.internal.R.
+     * Initialized with a capacity of 10,000 to comfortably fit all ~9,400 static framework
+     * resource IDs without triggering intermediate array reallocations during startup,
+     * while SparseArray can still dynamically grow if needed.
      */
-    private final static Map<Integer, Pair<ResourceType, String>> sRMap = new HashMap<>();
+    private final static SparseArray<ResourceReference> sRMap = new SparseArray<>(10000);
 
     /**
      * Reverse map compared to sRMap, resource type -> (resource name -> id).
@@ -309,9 +312,12 @@ public final class Bridge extends com.android.ide.common.rendering.api.Bridge {
                             continue;
                         }
                         Class<?> type = f.getType();
-                        if (!type.isArray()) {
-                            Integer value = (Integer) f.get(null);
-                            sRMap.put(value, Pair.create(resType, f.getName()));
+                        if (type == int.class) {
+                            int value = f.getInt(null);
+                            sRMap.put(
+                                    value,
+                                    new ResourceReference(
+                                            ResourceNamespace.ANDROID, resType, f.getName()));
                             fullMap.put(f.getName(), value);
                         }
                     }
@@ -411,14 +417,20 @@ public final class Bridge extends com.android.ide.common.rendering.api.Bridge {
                     break;
                 }
             }
-            index = (Integer) field.get(null);
+            index = field.getInt(null);
             if (arrayValue != null) {
                 String attrName = name.substring(arrayName.length() + 1);
                 int attrValue = arrayValue[index];
-                sRMap.put(attrValue, Pair.create(ResourceType.ATTR, attrName));
+                sRMap.put(
+                        attrValue,
+                        new ResourceReference(
+                                ResourceNamespace.ANDROID, ResourceType.ATTR, attrName));
                 revRAttrMap.put(attrName, attrValue);
             }
-            sRMap.put(index, Pair.create(ResourceType.STYLEABLE, name));
+            sRMap.put(
+                    index,
+                    new ResourceReference(
+                            ResourceNamespace.ANDROID, ResourceType.STYLEABLE, name));
             revRStyleableMap.put(name, index);
         }
     }
@@ -590,15 +602,15 @@ public final class Bridge extends com.android.ide.common.rendering.api.Bridge {
      */
     @Nullable
     public static ResourceReference resolveResourceId(int value) {
-        Pair<ResourceType, String> pair = sRMap.get(value);
-        if (pair == null) {
-            pair = sDynamicIds.resolveId(value);
+        ResourceReference ref = sRMap.get(value);
+        if (ref == null) {
+            Pair<ResourceType, String> pair = sDynamicIds.resolveId(value);
+            if (pair != null) {
+                return new ResourceReference(ResourceNamespace.ANDROID, pair.first, pair.second);
+            }
+            return null;
         }
-
-        if (pair != null) {
-            return new ResourceReference(ResourceNamespace.ANDROID, pair.first, pair.second);
-        }
-        return null;
+        return ref;
     }
 
     /**
