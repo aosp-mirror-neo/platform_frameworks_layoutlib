@@ -79,6 +79,7 @@ import android.view.ViewRootImpl_Accessor;
 import android.view.Window;
 import android.view.WindowManager;
 import android.view.WindowManagerGlobal;
+import android.view.WindowManagerGlobal_Delegate;
 import android.widget.ActionMenuView;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
@@ -92,6 +93,7 @@ import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferInt;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.IntBuffer;
@@ -157,6 +159,7 @@ public class RenderSessionImpl extends RenderAction<SessionParams> {
 
     private long mLastActionDownTimeNanos = -1;
     @Nullable private ValidatorHierarchy mValidatorHierarchy = null;
+    private final Object mWindowListenerLock = new Object();
     private Consumer<List<View>> mWindowChangeListener;
 
     private static final class PostInflateException extends Exception {
@@ -383,16 +386,11 @@ public class RenderSessionImpl extends RenderAction<SessionParams> {
             mRenderer = AttachInfo_Accessor.setAttachInfo(mViewRoot, layout);
 
             // Invalidate rendering when window is added or removed
-            if (mWindowChangeListener != null) {
-                WindowManagerGlobal.getInstance().removeWindowViewsListener(mWindowChangeListener);
+            synchronized (mWindowListenerLock) {
+                removeWindowViewsListener();
+                mWindowChangeListener = new WindowChangeListener(this);
+                WindowManagerGlobal_Delegate.addWindowViewsListener(mWindowChangeListener);
             }
-            mWindowChangeListener = views -> {
-                if (mRenderer != null) {
-                    mRenderer.invalidateRoot();
-                }
-            };
-            WindowManagerGlobal.getInstance()
-                    .addWindowViewsListener(Runnable::run, mWindowChangeListener);
 
             // post-inflate process. For now this supports TabHost/TabWidget
             postInflateProcess(view, params.getLayoutlibCallback(), isPreference ? view : null);
@@ -1176,10 +1174,6 @@ public class RenderSessionImpl extends RenderAction<SessionParams> {
         mMeasuredScreenWidth = mMeasuredScreenHeight = -1;
     }
 
-    public BufferedImage getImage() {
-        return mImage;
-    }
-
     @Nullable
     public RecyclableImage getRecyclableImage() {
         if (mImage == null) {
@@ -1376,15 +1370,21 @@ public class RenderSessionImpl extends RenderAction<SessionParams> {
         disposeImageSurface();
         mNewRenderSize = true;
     }
+
+    private void removeWindowViewsListener() {
+        synchronized (mWindowListenerLock) {
+            if (mWindowChangeListener != null) {
+                WindowManagerGlobal_Delegate.removeWindowViewsListener(mWindowChangeListener);
+                mWindowChangeListener = null;
+            }
+        }
+    }
+
     @Override
     public void dispose() {
         try {
             releaseRender();
-            if (mWindowChangeListener != null) {
-                WindowManagerGlobal.getInstance().mWindowViewsListenerGroup.mListeners
-                        .remove(mWindowChangeListener);
-                mWindowChangeListener = null;
-            }
+            removeWindowViewsListener();
             if (mRenderer != null) {
                 mRenderer.destroy();
                 mRenderer = null;
@@ -1392,8 +1392,15 @@ public class RenderSessionImpl extends RenderAction<SessionParams> {
             WindowManager wm = (WindowManager)getContext().getSystemService(Context.WINDOW_SERVICE);
             List<View> views = getWindowViews();
             for (View view : views) {
-                wm.removeViewImmediate(view);
+                try {
+                    ViewRootImpl root = view.getViewRootImpl();
+                    ViewRootImpl_Accessor.resetTraversalState(root);
+                    wm.removeViewImmediate(view);
+                } catch (Throwable t) {
+                    getContext().error("Error while removing window view", t);
+                }
             }
+            clearWindowViews();
             getContext().getSessionInteractiveData().dispose();
             if (mViewInfoList != null) {
                 mViewInfoList.clear();
@@ -1411,5 +1418,36 @@ public class RenderSessionImpl extends RenderAction<SessionParams> {
             getContext().error("Error while disposing a RenderSession", t);
         }
         super.dispose();
+    }
+
+    /**
+     * Purges all window views associated with this session's context from
+     * {@link WindowManagerGlobal}.
+     * It can be called safely even when the layoutlib lock is not held, as WindowManagerGlobal
+     * synchronizes on its own internal lock.
+     */
+    public void clearWindowViews() {
+        removeWindowViewsListener();
+        WindowManagerGlobal_Delegate.clearViewsForContext(getContext());
+    }
+
+    private static class WindowChangeListener implements Consumer<List<View>> {
+        private final WeakReference<RenderSessionImpl> mSessionRef;
+
+        private WindowChangeListener(RenderSessionImpl session) {
+            mSessionRef = new WeakReference<>(session);
+        }
+
+        @Override
+        public void accept(List<View> views) {
+            RenderSessionImpl session = mSessionRef.get();
+            if (session != null) {
+                if (session.mRenderer != null) {
+                    session.mRenderer.invalidateRoot();
+                }
+            } else {
+                WindowManagerGlobal_Delegate.removeWindowViewsListener(this);
+            }
+        }
     }
 }

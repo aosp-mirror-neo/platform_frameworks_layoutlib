@@ -32,4 +32,8 @@ public class ViewRootImpl_Delegate {
             int usage, int flags, int privFlags) {
         return false;
     }
+
+    @LayoutlibDelegate
+    /*package*/ static void checkThread(ViewRootImpl thisViewRoot) {
+    }
 }

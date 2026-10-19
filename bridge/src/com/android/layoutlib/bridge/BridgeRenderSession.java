@@ -37,10 +37,10 @@ import android.os.Looper_Accessor;
 import android.view.Choreographer_Delegate;
 import android.view.MotionEvent;
 
-import java.awt.image.BufferedImage;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 /**
  * An implementation of {@link RenderSession}.
@@ -56,17 +56,9 @@ public class BridgeRenderSession extends RenderSession {
     @NonNull
     private Result mLastResult;
 
-    private static final Runnable NOOP_RUNNABLE = () -> { };
-
     @Override
     public Result getResult() {
         return mLastResult;
-    }
-
-    @Override
-    public BufferedImage getImage() {
-        return mSession != null ? mSession.getImage() :
-                new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
     }
 
     @Override
@@ -233,7 +225,23 @@ public class BridgeRenderSession extends RenderSession {
 
     @Override
     public void dispose() {
-        execute(mSession::dispose);
+        if (mSession != null) {
+            try {
+                Looper_Accessor.setupThread(mSession);
+                mLastResult = mSession.acquire(TimeUnit.SECONDS.toMillis(5));
+                if (mLastResult.isSuccess()) {
+                    mSession.dispose();
+                } else {
+                    Bridge.getLog().warning(ILayoutLog.TAG_BROKEN,
+                            "Failed to acquire session lock cleanly during dispose: "
+                                    + mLastResult.getErrorMessage(), null, null);
+                    mSession.clearWindowViews();
+                }
+            } finally {
+                mSession.release();
+                Looper_Accessor.cleanupThread();
+            }
+        }
         ArrayUtils_Delegate.clearCache();
     }
 

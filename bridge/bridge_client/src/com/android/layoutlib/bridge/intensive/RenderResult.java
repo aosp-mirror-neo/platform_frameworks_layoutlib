@@ -49,15 +49,9 @@ public class RenderResult {
         RecyclableImage recyclableImage = session.getRecyclableImage();
         BufferedImage image = null;
         if (recyclableImage != null) {
-            BufferedImage renderedImage = recyclableImage.getImage();
-            int w = renderedImage.getWidth();
-            int h = renderedImage.getHeight();
-            image = new BufferedImage(w, h, renderedImage.getType());
-            Graphics2D g = image.createGraphics();
             try {
-                g.drawImage(renderedImage, 0, 0, w, h, 0, 0, w, h, null);
+                image = recyclableImage.getCopy();
             } finally {
-                g.dispose();
                 recyclableImage.close();
             }
         }
